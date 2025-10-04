@@ -1,31 +1,44 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:reset_app/main.dart';
-// Ensure that main.dart defines a class named MyApp and it is public.
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const ResetApp());
+  group('Delete Files App Widget Tests', () {
+    testWidgets('App should have correct title', (WidgetTester tester) async {
+      await tester.pumpWidget(const ResetApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+      expect(find.text('Delete Files App'), findsOneWidget);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    testWidgets('Main delete button should be visible', (WidgetTester tester) async {
+      await tester.pumpWidget(const ResetApp());
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      expect(find.text('🗑️ DELETAR TODOS OS ARQUIVOS'), findsOneWidget);
+    });
+
+    testWidgets('Warning message should be visible', (WidgetTester tester) async {
+      await tester.pumpWidget(const ResetApp());
+
+      expect(
+        find.textContaining('ATENÇÃO: Esta ação é permanente'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Title and subtitle should be visible', (WidgetTester tester) async {
+      await tester.pumpWidget(const ResetApp());
+
+      expect(find.text('Deletar Todos os Arquivos'), findsOneWidget);
+      expect(
+        find.text('Remove permanentemente TODOS os arquivos do dispositivo'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Delete icon should be visible', (WidgetTester tester) async {
+      await tester.pumpWidget(const ResetApp());
+
+      expect(find.byIcon(Icons.delete_forever), findsAtLeastNWidgets(1));
+    });
   });
 }

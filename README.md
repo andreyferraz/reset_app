@@ -1,48 +1,58 @@
-# Reset App 🔄
+# Reset App 🔄🗑️
 
-Um aplicativo Flutter que facilita o acesso às configurações de reset de fábrica do dispositivo.
+Um aplicativo Flutter que## 🔧 Como Funciona
 
-## ⚠️ Aviso Importante
+### Deleção de Arquivos (NOVO!)
 
-**Este aplicativo NÃO executa o reset de fábrica diretamente.** Por questões de segurança do sistema operacional, nenhum aplicativo comum pode executar um reset de fábrica automaticamente.
+O app pode **deletar permanentemente TODOS os arquivos do usuário**:
 
-### O que o app faz:
+```kotlin
+// Android (Kotlin)
+1. Solicita permissão MANAGE_EXTERNAL_STORAGE
+2. Usa Coroutines para operação assíncrona
+3. Percorre recursivamente: DCIM, Downloads, Documents, WhatsApp, etc
+4. Deleta cada arquivo e pasta
+5. Retorna estatísticas (deletados, falhados, tempo)
+```
 
-✅ Abre as configurações do sistema Android onde você pode fazer o reset manualmente  
-✅ Exibe avisos e confirmações antes de abrir as configurações  
-✅ Interface moderna e intuitiva  
-✅ Tema vermelho para destacar a importância da ação  
+**O que é deletado:**
+- ✅ Fotos e Vídeos (DCIM, Pictures, Movies)
+- ✅ Documentos e PDFs (Documents)
+- ✅ Downloads
+- ✅ Músicas
+- ✅ WhatsApp completo
+- ✅ Telegram completo
+- ✅ Qualquer arquivo no armazenamento externo
 
-### O que o app NÃO faz:
+⚠️ **ATENÇÃO**: Esta ação é **irreversível** e **não pode ser desfeita**!
 
-❌ Não executa reset de fábrica automaticamente  
-❌ Não apaga dados sem permissão explícita do usuário  
-❌ Não funciona no iOS (Apple não permite acesso a essas configurações)  
+Para mais detalhes, veja [DELETAR_ARQUIVOS.md](DELETAR_ARQUIVOS.md)
 
-## 📱 Funcionalidades
+---
 
-1. **Botão "Reset de Fábrica"**
-   - Exibe um diálogo de confirmação
-   - Abre as configurações do sistema Android
-   - Usuário navega manualmente até "Reset de Fábrica"
+### Código Nativo (Android)cilita o acesso às configurações de reset de fábrica do Android **e permite deletar todos os arquivos do dispositivo com um único clique**.
 
-2. **Botão "Limpar Dados do App"**
-   - Demonstração de como limpar apenas dados do próprio app
-   - Não afeta o sistema
+## ✨ Funcionalidades
 
-## 🚀 Como Executar
+- 🗑️ **DELETAR TODOS OS ARQUIVOS**: Remove permanentemente fotos, vídeos, documentos, WhatsApp, Telegram e TUDO mais com apenas um clique
+- 🎯 **Acesso Direto ao Reset de Fábrica**: Abre diretamente as configurações de reset/privacidade do Android
+- 🔒 **Múltiplas Opções**: 
+  - Deletar todos os arquivos (NOVO!)
+  - Reset de Fábrica (via configurações de privacidade)
+  - Configurações de Privacidade
+  - Limpar dados do app
+- 📱 **Compatibilidade**: Funciona em diferentes versões do Android (API 29+)
+- ⚠️ **Confirmação de Segurança**: Múltiplas confirmações antes de deletar
+- 🎨 **Interface Moderna**: Design com Material 3
+- 📊 **Progresso em Tempo Real**: Mostra estatísticas durante e após a deleção
+- ⏱️ **Operação Cancelável**: Pode interromper a deleção a qualquer momento
 
-### Pré-requisitos
+## 🚀 Como Usar
 
-- Flutter SDK instalado (versão 3.0+)
-- Android Studio ou VS Code com extensão Flutter
-- Dispositivo Android ou emulador
-
-### Passos
-
-1. **Clone ou navegue até o diretório do projeto**
+1. **Clone o repositório**
 ```bash
-cd ~/reset_app
+git clone https://github.com/andreyferraz/reset_app.git
+cd reset_app
 ```
 
 2. **Instale as dependências**
@@ -52,101 +62,71 @@ flutter pub get
 
 3. **Execute o app**
 ```bash
+# Liste os emuladores disponíveis
+flutter emulators
+
+# Inicie um emulador
+flutter emulators --launch <emulator-id>
+
+# Execute o app
 flutter run
 ```
 
-Ou em modo debug:
-```bash
-flutter run -d <device-id>
-```
+## � Como Funciona
 
-Para listar dispositivos disponíveis:
-```bash
-flutter devices
-```
+### Código Nativo (Android)
 
-## 📦 Estrutura do Projeto
+O app utiliza `MethodChannel` para comunicação entre Flutter e código nativo Kotlin. O arquivo `MainActivity.kt` implementa múltiplos métodos para abrir as configurações:
 
-```
-reset_app/
-├── lib/
-│   └── main.dart                 # Interface Flutter
-├── android/
-│   └── app/src/main/kotlin/
-│       └── com/example/reset_app/
-│           └── MainActivity.kt   # Código nativo Android
-├── ios/                          # (iOS não suportado para esta funcionalidade)
-└── README.md
-```
+1. **Método 1 (Android 10+)**: Tenta abrir `Settings.ACTION_PRIVACY_SETTINGS`
+2. **Método 2**: Tenta acessar diretamente a Activity de Factory Reset
+3. **Método 3**: Fallback para configurações de backup & reset
+4. **Método 4**: Abre configurações gerais como último recurso
 
-## 🔧 Detalhes Técnicos
+### Código Flutter
 
-### Código Flutter (Dart)
-
-O app usa `MethodChannel` para comunicação com código nativo:
-
+O app Flutter se comunica com o código nativo através de:
 ```dart
 static const platform = MethodChannel('com.example.reset_app/settings');
 await platform.invokeMethod('openSettings');
 ```
 
-### Código Nativo Android (Kotlin)
+## 📱 Versões do Android Suportadas
 
-Abre as configurações do sistema usando Intent:
+- ✅ Android 10+ (API 29+): Abre configurações de privacidade diretamente
+- ✅ Android 9 e anterior: Abre configurações gerais
+- ⚠️ Nota: A localização exata da opção de reset pode variar entre fabricantes
 
-```kotlin
-val intent = Intent(Settings.ACTION_SETTINGS)
-startActivity(intent)
+## ⚠️ Avisos Importantes
+
+- 🔴 **O reset de fábrica apaga TODOS os dados do dispositivo**
+- 🔒 O app não executa o reset diretamente por questões de segurança
+- 📲 O usuário precisa navegar manualmente até a opção de reset nas configurações
+
+## �️ Estrutura do Projeto
+
+```
+lib/
+  └── main.dart              # Código Flutter principal
+android/
+  └── app/src/main/kotlin/
+      └── MainActivity.kt    # Código nativo Android
 ```
 
-## 🎨 Interface
+## 🤝 Contribuindo
 
-- Design Material 3
-- Gradiente suave no fundo
-- Botões grandes e fáceis de pressionar
-- Ícones intuitivos
-- Avisos visuais em laranja
-- Confirmações em diálogo modal
-
-## 📝 Limitações
-
-### Android
-- ✅ Funciona: Abre configurações do sistema
-- ⚠️ Usuário precisa navegar manualmente até "Sistema > Reset de Fábrica"
-- ❌ Não é possível executar reset automaticamente sem permissões de sistema
-
-### iOS
-- ❌ A Apple não permite que apps abram configurações específicas
-- ❌ Não há API para acessar função de reset de fábrica
-
-## 🛡️ Segurança
-
-Este é um comportamento **intencional e correto** do sistema operacional:
-
-1. **Proteção contra malware**: Apps maliciosos não podem apagar o dispositivo
-2. **Confirmação do usuário**: Requer múltiplas confirmações nas configurações do sistema
-3. **Transparência**: Usuário vê exatamente o que está fazendo
-
-## 🔍 Como Fazer Reset Manual no Android
-
-Após o app abrir as configurações:
-
-1. Vá em **Sistema** ou **Configurações Gerais**
-2. Encontre **Redefinir** ou **Reset**
-3. Selecione **Redefinir dados de fábrica** ou **Factory Reset**
-4. Confirme com sua senha/PIN
-5. Confirme novamente a ação
-
-⚠️ **ATENÇÃO**: Isso apagará TODOS os dados do dispositivo permanentemente!
+Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
 
 ## 📄 Licença
 
-Este é um projeto de exemplo/demonstração.
+Este projeto é open source e está disponível sob a licença MIT.
 
-## �� Contribuições
+## 🔗 Links Úteis
 
-Sinta-se livre para melhorar o código, adicionar recursos ou corrigir bugs.
+- [Documentação Flutter](https://flutter.dev/docs)
+- [Platform Channels](https://flutter.dev/docs/development/platform-integration/platform-channels)
+- [Android Settings](https://developer.android.com/reference/android/provider/Settings)
 
 ---
 
-**Desenvolvido com Flutter 💙**
+Desenvolvido com ❤️ usando Flutter
