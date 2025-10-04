@@ -331,33 +331,32 @@ class MainActivity: FlutterActivity() {
                 }
             }
         }
+    }
 
-        private fun reportDeletionProgress(
-            path: String,
-            isDirectory: Boolean,
-            success: Boolean,
-            deletedCount: Int,
-            failedCount: Int
-        ) {
-            if (!this::methodChannel.isInitialized) return
+    private fun reportDeletionProgress(
+        path: String,
+        isDirectory: Boolean,
+        success: Boolean,
+        deletedCount: Int,
+        failedCount: Int
+    ) {
+        if (!this::methodChannel.isInitialized) return
 
-            runOnUiThread {
-                try {
-                    methodChannel.invokeMethod(
-                        "deleteProgress",
-                        mapOf(
-                            "path" to path,
-                            "isDirectory" to isDirectory,
-                            "success" to success,
-                            "deletedCount" to deletedCount,
-                            "failedCount" to failedCount
-                        )
+        runOnUiThread {
+            try {
+                methodChannel.invokeMethod(
+                    "deleteProgress",
+                    mapOf(
+                        "path" to path,
+                        "isDirectory" to isDirectory,
+                        "success" to success,
+                        "deletedCount" to deletedCount,
+                        "failedCount" to failedCount
                     )
-                } catch (_: Exception) {
-                    // Ignora erros ao enviar progresso
-                }
+                )
+            } catch (_: Exception) {
+                // Ignora erros ao enviar progresso
             }
         }
     }
-
 }
