@@ -13,11 +13,14 @@ import java.io.File
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.example.reset_app/settings"
+    private lateinit var methodChannel: MethodChannel
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+
+        methodChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "openSettings" -> {
                     openFactoryResetSettings(result)
@@ -246,19 +249,18 @@ class MainActivity: FlutterActivity() {
                 }
 
                 // Função iterativa para deletar (mais eficiente que recursiva)
-                fun deleteDirectoryIteratively(directory: File): Pair<Int, Int> {
-                    var deleted = 0
-                    var failed = 0
-                    
+                fun deleteDirectoryIteratively(directory: File, onItemProcessed: (File, Boolean) -> Unit) {
+                    if (!directory.exists()) return
+
                     val stack = ArrayDeque<File>()
                     stack.add(directory)
-                    
+
                     val toDelete = mutableListOf<File>()
-                    
+
                     // Fase 1: Coleta todos os arquivos (BFS)
                     while (stack.isNotEmpty()) {
                         val current = stack.removeFirst()
-                        
+
                         if (current.isDirectory) {
                             try {
                                 val children = current.listFiles()
@@ -267,37 +269,47 @@ class MainActivity: FlutterActivity() {
                                         stack.add(child)
                                     }
                                 }
-                                toDelete.add(current) // Adiciona pasta para deletar depois
-                            } catch (e: Exception) {
-                                failed++
+                            } catch (_: Exception) {
+                                // Ignora erros ao listar
                             }
-                        } else {
-                            toDelete.add(current) // Adiciona arquivo
                         }
+                        toDelete.add(current)
                     }
-                    
+
                     // Fase 2: Deleta na ordem reversa (arquivos primeiro, depois pastas vazias)
                     for (i in toDelete.size - 1 downTo 0) {
-                        try {
-                            if (toDelete[i].delete()) {
-                                deleted++
-                            } else {
-                                failed++
-                            }
-                        } catch (e: Exception) {
-                            failed++
+                        val item = toDelete[i]
+                        val success = try {
+                            item.delete()
+                        } catch (_: Exception) {
+                            false
                         }
+
+                        onItemProcessed(item, success)
                     }
-                    
-                    return Pair(deleted, failed)
                 }
 
                 // Deleta cada diretório específico
-                specificDirectories.forEachIndexed { index, dir ->
+                specificDirectories.forEach { dir ->
                     if (dir.exists()) {
-                        val (d, f) = deleteDirectoryIteratively(dir)
-                        deletedCount += d
-                        failedCount += f
+                        deleteDirectoryIteratively(dir) { item, success ->
+                            if (success) {
+                                deletedCount++
+                            } else {
+                                failedCount++
+                            }
+
+                            // Reporta progresso apenas para arquivos ou falhas
+                            if (!item.isDirectory || !success) {
+                                reportDeletionProgress(
+                                    item.absolutePath,
+                                    item.isDirectory,
+                                    success,
+                                    deletedCount,
+                                    failedCount
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -316,6 +328,33 @@ class MainActivity: FlutterActivity() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     result.error("ERROR", "Erro ao deletar arquivos: ${e.message}", null)
+                }
+            }
+        }
+
+        private fun reportDeletionProgress(
+            path: String,
+            isDirectory: Boolean,
+            success: Boolean,
+            deletedCount: Int,
+            failedCount: Int
+        ) {
+            if (!this::methodChannel.isInitialized) return
+
+            runOnUiThread {
+                try {
+                    methodChannel.invokeMethod(
+                        "deleteProgress",
+                        mapOf(
+                            "path" to path,
+                            "isDirectory" to isDirectory,
+                            "success" to success,
+                            "deletedCount" to deletedCount,
+                            "failedCount" to failedCount
+                        )
+                    )
+                } catch (_: Exception) {
+                    // Ignora erros ao enviar progresso
                 }
             }
         }

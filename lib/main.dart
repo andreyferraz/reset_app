@@ -2,6 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+class DeletionRecord {
+  DeletionRecord({
+    required this.path,
+    required this.displayName,
+    required this.success,
+    required this.isDirectory,
+    required this.timestamp,
+  });
+
+  final String path;
+  final String displayName;
+  final bool success;
+  final bool isDirectory;
+  final DateTime timestamp;
+}
+
 void main() {
   runApp(const ResetApp());
 }
@@ -37,6 +53,75 @@ class _ResetHomePageState extends State<ResetHomePage> {
   static const platform = MethodChannel('com.example.reset_app/settings');
   bool _isDeleting = false;
   String _lastMessage = '';
+  final List<DeletionRecord> _recentDeletions = [];
+  int _totalDeleted = 0;
+  int _totalFailed = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    platform.setMethodCallHandler(_handleNativeCalls);
+  }
+
+  @override
+  void dispose() {
+    platform.setMethodCallHandler(null);
+    super.dispose();
+  }
+
+  Future<dynamic> _handleNativeCalls(MethodCall call) async {
+    if (!mounted) return null;
+
+    switch (call.method) {
+      case 'deleteProgress':
+        final arguments = Map<String, dynamic>.from(call.arguments as Map);
+        final path = arguments['path'] as String? ?? '';
+        final isDirectory = arguments['isDirectory'] as bool? ?? false;
+        final success = arguments['success'] as bool? ?? true;
+        final deletedCount = (arguments['deletedCount'] as num?)?.toInt() ?? _totalDeleted;
+        final failedCount = (arguments['failedCount'] as num?)?.toInt() ?? _totalFailed;
+
+        final displayName = _extractDisplayName(path, isDirectory: isDirectory);
+        final record = DeletionRecord(
+          path: path,
+          displayName: displayName,
+          success: success,
+          isDirectory: isDirectory,
+          timestamp: DateTime.now(),
+        );
+
+        setState(() {
+          _totalDeleted = deletedCount;
+          _totalFailed = failedCount;
+          _recentDeletions.insert(0, record);
+          if (_recentDeletions.length > 50) {
+            _recentDeletions.removeRange(50, _recentDeletions.length);
+          }
+
+          final statusPrefix = success ? '🗑️ Removido' : '⚠️ Falha ao remover';
+          _lastMessage = '$statusPrefix: $displayName\n'
+              'Total removidos: $deletedCount | Falhas: $failedCount';
+        });
+        break;
+      default:
+        break;
+    }
+
+    return null;
+  }
+
+  String _extractDisplayName(String path, {required bool isDirectory}) {
+    if (path.isEmpty) {
+      return isDirectory ? 'Pasta desconhecida' : 'Arquivo desconhecido';
+    }
+
+    final segments = path.split(RegExp(r'[\\/]+')).where((segment) => segment.isNotEmpty).toList();
+    if (segments.isEmpty) {
+      return path;
+    }
+
+    return segments.last;
+  }
 
   Future<void> _requestStoragePermission() async {
     // Android 11+ requer permissão especial
@@ -123,6 +208,9 @@ class _ResetHomePageState extends State<ResetHomePage> {
 
     setState(() {
       _isDeleting = true;
+      _totalDeleted = 0;
+      _totalFailed = 0;
+      _recentDeletions.clear();
       _lastMessage = '🔄 DELETANDO ARQUIVOS...\n\n'
           'Isso pode levar vários minutos.\n'
           'NÃO FECHE O APP!\n\n'
@@ -138,6 +226,8 @@ class _ResetHomePageState extends State<ResetHomePage> {
         final duration = result['durationMs'] ?? 0;
 
         setState(() {
+          _totalDeleted = deletedCount;
+          _totalFailed = failedCount;
           _lastMessage = '✅ OPERAÇÃO CONCLUÍDA!\n\n'
               '🗑️ $deletedCount arquivos deletados\n'
               '⚠️ $failedCount falharam\n'
@@ -197,18 +287,18 @@ class _ResetHomePageState extends State<ResetHomePage> {
             ],
           ),
         ),
-        child: Center(
-          child: Padding(
+        child: SafeArea(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(
                   Icons.delete_forever,
                   size: 120,
                   color: Colors.red[700],
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 Text(
                   'Deletar Todos os Arquivos',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -216,7 +306,7 @@ class _ResetHomePageState extends State<ResetHomePage> {
                       ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text(
                   'Remove permanentemente TODOS os arquivos do dispositivo',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -224,8 +314,8 @@ class _ResetHomePageState extends State<ResetHomePage> {
                       ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 48),
-                
+                const SizedBox(height: 32),
+
                 // Botão PRINCIPAL - Deletar TODOS os arquivos
                 SizedBox(
                   width: double.infinity,
@@ -256,10 +346,11 @@ class _ResetHomePageState extends State<ResetHomePage> {
                     ),
                   ),
                 ),
-                
+
                 if (_isDeleting) ...[
                   const SizedBox(height: 24),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.orange[50],
@@ -297,12 +388,16 @@ class _ResetHomePageState extends State<ResetHomePage> {
                     ),
                   ),
                 ],
-                
-                const SizedBox(height: 32),
-                
-                // Mostra a última mensagem
-                if (_lastMessage.isNotEmpty)
+
+                if (_recentDeletions.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildRecentDeletionsCard(context),
+                ],
+
+                if (_lastMessage.isNotEmpty) ...[
+                  const SizedBox(height: 24),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.blue[50],
@@ -326,11 +421,13 @@ class _ResetHomePageState extends State<ResetHomePage> {
                       ],
                     ),
                   ),
-                
-                const Spacer(),
-                
+                ],
+
+                const SizedBox(height: 24),
+
                 // Aviso importante
                 Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.orange[50],
@@ -338,6 +435,7 @@ class _ResetHomePageState extends State<ResetHomePage> {
                     border: Border.all(color: Colors.orange[300]!),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 28),
                       const SizedBox(width: 12),
@@ -358,6 +456,78 @@ class _ResetHomePageState extends State<ResetHomePage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecentDeletionsCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final itemsToShow = _recentDeletions.take(20).toList();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withOpacity(0.95),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.list_alt, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Itens recentes deletados',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: itemsToShow.length,
+            separatorBuilder: (_, __) => const Divider(height: 12, thickness: 0.6),
+            itemBuilder: (context, index) {
+              final record = itemsToShow[index];
+              final icon = record.isDirectory ? Icons.folder : Icons.insert_drive_file;
+              final iconColor = record.success ? Colors.green[700] : Colors.red[700];
+              final subtitle = record.success ? 'Removido com sucesso' : 'Falha ao remover';
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(icon, color: iconColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          record.displayName,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          subtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: record.success ? Colors.green[700] : Colors.red[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
